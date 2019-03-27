@@ -1,0 +1,75 @@
+import socket
+import sys
+import os
+import time
+from threading import Thread
+import glob
+import json
+
+class Server(Thread):
+	def __init__(self):
+		self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		self.sock.bind(('127.0.0.1', 6000))
+		print('Waiting')
+		Thread.__init__(self)
+
+	def run(self):
+		self.sock.listen(1)
+		while True:
+			conn, address = self.sock.accept()
+			Clients(conn, address).start()
+
+
+class Clients(Thread):
+	def __init__(self, connection, address):
+		self.connection = connection
+		self.address = address
+		Thread.__init__(self)
+
+	def dirfunc(self, request):
+		response = {}
+		dir_list = glob.glob(request['dir']+'*')
+		response['dir_list'] = map(
+			lambda file_name : {'name':file_name, 'is_file' : os.path.isfile(request['dir']+file_name)},
+			dir_list
+		)
+		self.connection.sendall(json.dumps(response))
+
+	def downloadfunc(self, request):
+		fd = open(request['path'], 'rb')
+		response = {}
+		response['file_size'] = os.path.getsize(request['path'])
+		self.connection.sendall(json.dumps(response))
+		for data in fd:
+			self.connection.sendall(data)
+		print "Sukses"
+		fd.close()
+
+	def uploadfunc(self, request):
+		max_size = request['file_size']
+		received = 0
+		fd = open(request['path'], 'wb+', 0)
+		self.connection.sendall('--OK--')
+		while received < max_size:
+			data = self.connection.recv(1024)
+			received += len(data)
+			fd.write(data)
+
+		print('Sukses')
+		fd.close()
+
+	def run(self):
+		while True:
+			data = self.connection.recv(1024)
+			request = json.loads(data)
+			cmd = request['command']
+
+			if cmd == 'dir':
+				self.dirfunc(request)
+			elif cmd == 'download':
+				self.downloadfunc(request)
+			elif cmd == 'upload':
+				self.uploadfunc(request)
+
+if __name__=="__main__":
+	Server().start()

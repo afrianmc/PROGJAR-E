@@ -1,4 +1,7 @@
-cd change folder
-dir list folder
-download download file
-upload upload file
+- cd change folder
+
+- dir list folder
+
+- download download file
+
+- upload upload file
